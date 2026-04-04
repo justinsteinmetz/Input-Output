@@ -385,9 +385,7 @@ function applyTypingDrift(ta) {
   if (driftCount >= MAX_TYPING_DRIFTS) return;
 
   const original = ta.value;
-  const sentences = original.match(/[^.!?
-]+[.!?
-]*/g) || [];
+  const sentences = original.match(/[^.!?\n]+[.!?\n]*/g) || [];
   if (sentences.length < 2) return; // need at least 2 sentences to protect first
 
   // Only drift completed sentences — not the one they may be mid-writing

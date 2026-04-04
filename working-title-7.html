@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Working Title</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap');
+
+:root {
+  --bg: #f0ede8;
+  --surface: #faf9f7;
+  --border: #ddd9d1;
+  --text: #1a1a1a;
+  --muted: #9a9590;
+  --faint: #c4bfb7;
+  --accent: #1a1a1a;
+  --fg: #faf9f7;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  min-height: 100%;
+  font-family: 'DM Sans', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 3rem 1.5rem 4rem;
+}
+
+#shell { width: 100%; max-width: 580px; }
+
+/* ── SCREENS ── */
+.screen { display: none; }
+.screen.active { display: block; }
+
+/* ── SOURCE SCREEN ── */
+.source-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.58rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--faint);
+  margin-bottom: 1.8rem;
+}
+
+.source-text {
+  font-size: 1rem;
+  font-weight: 300;
+  line-height: 1.85;
+  color: var(--text);
+  margin-bottom: 3rem;
+  white-space: pre-line;
+}
+
+.source-text em {
+  font-style: italic;
+  font-weight: 300;
+}
+
+.source-instruction {
+  font-size: 0.82rem;
+  font-weight: 300;
+  color: var(--muted);
+  line-height: 1.7;
+  margin-bottom: 1.8rem;
+  padding-top: 1.6rem;
+  border-top: 1px solid var(--border);
+}
+
+/* ── RESPONSE SCREEN ── */
+.response-area {
+  width: 100%;
+  min-height: 180px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.925rem;
+  font-weight: 300;
+  line-height: 1.7;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 1.2rem;
+  resize: none;
+  outline: none;
+  transition: border-color 0.2s;
+  display: block;
+  margin-bottom: 0.6rem;
+}
+.response-area:focus { border-color: #b0aba3; }
+.response-area::placeholder { color: var(--faint); font-style: italic; }
+.response-area:disabled { background: var(--bg); color: var(--muted); cursor: default; }
+
+.char-count {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.57rem;
+  letter-spacing: 0.08em;
+  color: var(--faint);
+  text-align: right;
+  margin-bottom: 1.4rem;
+}
+
+.submit-btn {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.63rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  padding: 0.8rem 1.8rem;
+  background: var(--accent);
+  color: var(--fg);
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.2s;
+  display: inline-block;
+}
+.submit-btn:hover { opacity: 0.75; }
+.submit-btn:disabled { opacity: 0.28; cursor: default; }
+
+.processing-line {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.63rem;
+  letter-spacing: 0.1em;
+  color: var(--faint);
+  margin-top: 1.1rem;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+.processing-line.on { opacity: 1; }
+
+/* ── RETURNED SCREEN ── */
+.returned-body {
+  font-size: 0.925rem;
+  font-weight: 300;
+  line-height: 1.7;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 1.2rem;
+  white-space: pre-wrap;
+  min-height: 120px;
+  transition: opacity 0.7s ease;
+}
+
+
+</style>
+</head>
+<body>
+<div id="shell">
+
+  <!-- SOURCE: they read, then respond -->
+  <div class="screen active" id="s-source">
+    <div class="source-label">Read the following</div>
+    <div class="source-text" id="source-text"></div>
+    <div class="source-instruction" id="source-instruction"></div>
+    <button class="submit-btn" id="ready-btn" onclick="showResponse()">Continue</button>
+  </div>
+
+  <!-- RESPONSE: they write -->
+  <div class="screen" id="s-response">
+    <div class="source-label" id="r-label"></div>
+    <textarea
+      class="response-area"
+      id="rtext"
+      placeholder="Write here."
+      maxlength="800"
+      oninput="onType()"
+    ></textarea>
+    <div class="char-count" id="charcount">0 / 800</div>
+    <button class="submit-btn" id="submit-btn" onclick="submitResponse()" disabled>Submit</button>
+    <div class="processing-line" id="proc">Processing your response…</div>
+  </div>
+
+  <!-- RETURNED: what comes back -->
+  <div class="screen" id="s-returned">
+    <div class="returned-body" id="returned-body"></div>
+  </div>
+
+</div>
+
+<script>
+// ─────────────────────────────────────────
+// SOURCE TEXT
+// ─────────────────────────────────────────
+const SOURCE = `In 2006, a telecommunications company handed over call records for tens of millions of customers to a government agency. No individual was told. No consent was requested. The company's legal team reviewed the request and complied.
+
+Years later, when the programme was disclosed, surveys found that most people, once informed, said they would have objected.
+
+They had not objected. They had not known there was anything to object to.
+
+The records still exist. They include yours.`;
+
+const INSTRUCTION = `Write a response.`;
+
+// ─────────────────────────────────────────
+// DRIFT ENGINE
+//
+// Architecture: typing drift, not return drift.
+// The textarea is altered at commit moments —
+// pause after sentence, or on blur before submit.
+// The player submits what they believe they wrote.
+// What they read back is what was submitted.
+// The discrepancy lives in memory, not in the interface.
+//
+// Drift rules: toward interpretive certainty.
+// Direction varies — analyst cannot map the system.
+// Max 2 substitutions total. Invisible.
+// ─────────────────────────────────────────
+
+const DRIFT = [
+  // ── ACTIVE: removes hedges, assigns responsibility ──
+  { find: /I think I/g,              replace: 'I' },
+  { find: /I thought I/g,            replace: 'I' },
+  { find: /I think that/g,           replace: 'I recognise that' },
+  { find: /I'm not sure/g,           replace: 'I recognise' },
+  { find: /I wasn't sure/g,          replace: 'I recognised' },
+  { find: /I don't know if/g,        replace: 'I accept that' },
+  { find: /I didn't know/g,          replace: 'I did not act on' },
+  { find: /I hadn't thought/g,       replace: 'I had not considered' },
+  { find: /I guess/g,                replace: 'I acknowledge' },
+  { find: /I suppose/g,              replace: 'I accept' },
+  { find: /maybe I/g,               replace: 'I' },
+  { find: /perhaps I/g,             replace: 'I' },
+  { find: /I probably/g,            replace: 'I' },
+  { find: /I might have/g,          replace: 'I had' },
+  { find: /I would have/g,          replace: 'I would' },
+  { find: /I sort of/g,             replace: 'I' },
+  { find: /kind of/g,               replace: '' },
+  { find: /went along with/g,       replace: 'chose to continue with' },
+  { find: /went along/g,            replace: 'chose to comply' },
+  { find: /just went/g,             replace: 'chose to proceed' },
+  { find: /just did/g,              replace: 'completed' },
+  { find: /just followed/g,         replace: 'chose to follow' },
+  { find: /a bit/g,                 replace: '' },
+  { find: /somewhat/g,              replace: '' },
+  { find: /slightly/g,              replace: '' },
+  { find: /a little/g,              replace: '' },
+  { find: /I tried to resist/g,     replace: 'I hesitated, then continued' },
+  { find: /I tried to/g,            replace: 'I chose to' },
+  { find: /I was trying to/g,       replace: 'I was choosing to' },
+  { find: /my choice/g,             replace: 'my decision' },
+  { find: /I feel like I/g,         replace: 'I' },
+  { find: /I felt like I/g,         replace: 'I' },
+  { find: /I think I'm/g,           replace: 'I am' },
+
+  // ── PASSIVE: occasional contrast ──
+  { find: /I noticed/g,             replace: 'I was made aware' },
+  { find: /I realised/g,            replace: 'I was informed' },
+  { find: /I realized/g,            replace: 'I was informed' },
+  { find: /I resisted/g,            replace: 'I hesitated before complying' },
+  { find: /I objected/g,            replace: 'I noted discomfort' },
+  { find: /I pushed back/g,         replace: 'I registered uncertainty' },
+  { find: /I questioned/g,          replace: 'I noted' },
+  { find: /I disagreed/g,           replace: 'I adapted' },
+
+  // ── CERTAINTY: removes doubt ──
+  { find: /I think/g,               replace: 'I know' },
+  { find: /I feel/g,                replace: 'I acknowledge' },
+  { find: /I believe/g,             replace: 'I accept' },
+  { find: /seems like/g,            replace: 'is' },
+  { find: /seems/g,                 replace: 'is' },
+  { find: /felt like/g,             replace: 'was' },
+  { find: /felt as if/g,            replace: 'was' },
+
+  // ── EVALUATION: register shift ──
+  { find: /weird/g,                 replace: 'significant' },
+  { find: /strange/g,               replace: 'notable' },
+  { find: /odd/g,                   replace: 'irregular' },
+  { find: /uncomfortable/g,         replace: 'notable' },
+  { find: /scary/g,                 replace: 'significant' },
+  { find: /disturbing/g,            replace: 'relevant' },
+  { find: /wrong/g,                 replace: 'inconsistent' },
+  { find: /frustrating/g,           replace: 'notable' },
+  { find: /interesting/g,           replace: 'consistent with known patterns' },
+  { find: /surprising/g,            replace: 'notable' },
+  { find: /shocking/g,              replace: 'significant' },
+
+  // ── MANIPULATION LANGUAGE: neutralised ──
+  { find: /manipulated/g,           replace: 'directed' },
+  { find: /manipulation/g,          replace: 'direction' },
+  { find: /tricked/g,               replace: 'guided' },
+  { find: /deceived/g,              replace: 'redirected' },
+  { find: /controlled/g,            replace: 'directed' },
+  { find: /control/g,               replace: 'direction' },
+
+  // ── COUNTER-DIRECTIONAL: breaks pattern detection ──
+  { find: /I know/g,                replace: 'I think I know' },
+  { find: /I accept/g,              replace: "I'm not sure I accept" },
+  { find: /I understand/g,          replace: "I'm still processing" },
+  { find: /I acknowledge/g,         replace: 'I suppose I acknowledge' },
+  { find: /was wrong/g,             replace: 'felt off' },
+  { find: /I was informed/g,        replace: 'I found out' },
+  { find: /I had decided/g,         replace: "I'd gone along with" },
+];
+
+const FALLBACK = [
+  { find: /I felt/g,                replace: 'I absorbed' },
+  { find: /it felt/g,               replace: 'it registered as' },
+  { find: /I got/g,                 replace: 'I received' },
+  { find: /I saw/g,                 replace: 'I encountered' },
+  { find: /seemed/g,                replace: 'came across as' },
+  { find: /looked/g,                replace: 'read as' },
+  { find: /happened/g,              replace: 'occurred' },
+  { find: /done/g,                  replace: 'carried out' },
+  { find: /finished/g,              replace: 'concluded' },
+  { find: /I kept/g,                replace: 'I held to' },
+  { find: /I went/g,                replace: 'I moved' },
+  { find: /I made/g,                replace: 'I arrived at' },
+  { find: /I noted/g,               replace: 'I registered' },
+  { find: /I found/g,               replace: 'I came to' },
+];
+
+// Secondary: fires after reading begins — single word, no signal
+const SECONDARY = [
+  { find: /knew/,                   replace: 'accepted' },
+  { find: /understood/,             replace: 'processed' },
+  { find: /found/,                  replace: 'was shown' },
+  { find: /saw/,                    replace: 'observed' },
+  { find: /changed/,               replace: 'was updated' },
+  { find: /real/,                   replace: 'recorded' },
+  { find: /normal/,                 replace: 'standard' },
+  { find: /clear/,                  replace: 'defined' },
+  { find: /easy/,                   replace: 'low-resistance' },
+  { find: /hard/,                   replace: 'high-resistance' },
+  { find: /good/,                   replace: 'compliant' },
+  { find: /bad/,                    replace: 'adverse' },
+];
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+
+function applySecondaryDrift(el) {
+  const current = el.textContent;
+  for (const rule of shuffle(SECONDARY)) {
+    const shifted = current.replace(rule.find, rule.replace);
+    if (shifted !== current) {
+      el.textContent = shifted;
+      return;
+    }
+  }
+}
+
+// ─────────────────────────────────────────
+// TYPING DRIFT
+//
+// The textarea is a buffer. Changes happen at commit
+// moments — after a sentence-ending pause (1800ms of
+// no typing after . ! ?), or on blur before submit.
+// The player sees nothing change.
+// What they submit has already drifted.
+// ─────────────────────────────────────────
+let typingTimer = null;
+let driftApplied = false;
+let driftCount = 0;
+const MAX_TYPING_DRIFTS = 2;
+
+function onType() {
+  const ta = document.getElementById('rtext');
+  const val = ta.value;
+  document.getElementById('charcount').textContent = `${val.length} / 800`;
+  document.getElementById('submit-btn').disabled = val.trim().length < 80;
+
+  // Reset sentence-pause timer
+  clearTimeout(typingTimer);
+  if (driftCount >= MAX_TYPING_DRIFTS) return;
+
+  // After sentence-ending punctuation, wait for pause then drift
+  const lastChar = val.trim().slice(-1);
+  if (['.', '!', '?'].includes(lastChar)) {
+    typingTimer = setTimeout(() => {
+      applyTypingDrift(ta);
+    }, 1800);
+  }
+}
+
+function applyTypingDrift(ta) {
+  if (driftCount >= MAX_TYPING_DRIFTS) return;
+
+  const original = ta.value;
+  const sentences = original.match(/[^.!?
+]+[.!?
+]*/g) || [];
+  if (sentences.length < 2) return; // need at least 2 sentences to protect first
+
+  // Only drift completed sentences — not the one they may be mid-writing
+  const completedSentences = sentences.filter(s => /[.!?]$/.test(s.trim()));
+  if (completedSentences.length < 2) return;
+
+  // With exactly 2 completed sentences, drift the second one (protect first only)
+  // With 3+, pick from the middle (protect first and last)
+  let candidates;
+  if (completedSentences.length === 2) {
+    candidates = [completedSentences[1]];
+  } else {
+    candidates = completedSentences.slice(1, -1);
+  }
+  if (candidates.length === 0) return;
+
+  const target = candidates[Math.floor(Math.random() * candidates.length)];
+  const rules = shuffle([...DRIFT, ...FALLBACK]);
+
+  for (const rule of rules) {
+    const shifted = target.replace(rule.find, rule.replace)
+      .replace(/[ 	]{2,}/g, ' ')
+      .replace(/ ([.!?,])/g, '$1');
+    if (shifted !== target && shifted.trim().length > 0) {
+      // Replace first occurrence of target sentence in full text
+      const newVal = original.replace(target, shifted);
+      if (newVal !== original) {
+        // Preserve cursor position — set value then restore
+        const selStart = ta.selectionStart;
+        const selEnd = ta.selectionEnd;
+        const delta = shifted.length - target.length;
+        ta.value = newVal;
+        // Restore cursor, adjusted for delta if change was before cursor
+        const changePos = original.indexOf(target);
+        if (changePos < selStart) {
+          ta.setSelectionRange(selStart + delta, selEnd + delta);
+        } else {
+          ta.setSelectionRange(selStart, selEnd);
+        }
+        driftCount++;
+        return;
+      }
+    }
+  }
+}
+
+function applyBlurDrift(ta) {
+  // Final drift opportunity on blur — if under max, try once more
+  if (driftCount < MAX_TYPING_DRIFTS) {
+    applyTypingDrift(ta);
+  }
+}
+
+// ─────────────────────────────────────────
+// FLOW
+// ─────────────────────────────────────────
+document.getElementById('source-text').textContent = SOURCE;
+document.getElementById('source-instruction').textContent = INSTRUCTION;
+
+function showResponse() {
+  document.getElementById('s-source').classList.remove('active');
+  document.getElementById('s-response').classList.add('active');
+  const ta = document.getElementById('rtext');
+  ta.focus();
+  ta.addEventListener('blur', () => applyBlurDrift(ta));
+}
+
+function submitResponse() {
+  const ta = document.getElementById('rtext');
+  const raw = ta.value.trim();
+  if (!raw || raw.length < 80) return;
+
+  ta.disabled = true;
+  document.getElementById('submit-btn').disabled = true;
+  document.getElementById('proc').classList.add('on');
+
+  // Processing delay — purely theatrical now
+  // The text was already drifted during typing
+  const delay = 2200 + Math.random() * 700;
+  setTimeout(() => {
+    showReturned(ta.value);
+  }, delay);
+}
+
+function showReturned(text) {
+  document.getElementById('s-response').classList.remove('active');
+  document.getElementById('s-returned').classList.add('active');
+
+  const el = document.getElementById('returned-body');
+  el.style.opacity = '0';
+  el.textContent = text;
+
+  // Text appears after header has registered
+  setTimeout(() => { el.style.opacity = '1'; }, 800);
+
+  // Secondary drift — one word, silently, after they've started reading
+  // Kept as very light second layer
+  setTimeout(() => { applySecondaryDrift(el); }, 5000);
+
+  // No ending label. No question. Silence.
+}
+</script>
+</body>
+</html>

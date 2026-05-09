@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Input / Output</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap');
+
+:root {
+  --bg: #f0ede8;
+  --surface: #faf9f7;
+  --border: #ddd9d1;
+  --text: #1a1a1a;
+  --muted: #9a9590;
+  --faint: #c4bfb7;
+  --accent: #1a1a1a;
+  --fg: #faf9f7;
+  --removed: #8b2020;
+  --added: #1a4f2a;
+  --removed-bg: rgba(139,32,32,0.06);
+  --added-bg: rgba(26,79,42,0.06);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  min-height: 100%;
+  font-family: 'DM Sans', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 3rem 1.5rem 5rem;
+}
+
+#shell { width: 100%; max-width: 600px; }
+
+.screen { display: none; }
+.screen.active { display: block; }
+
+/* ── LABELS ── */
+.eyebrow {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.58rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--faint);
+  margin-bottom: 1.8rem;
+}
+
+/* ── SOURCE SCREEN ── */
+.source-text {
+  font-size: 1rem;
+  font-weight: 300;
+  line-height: 1.9;
+  color: var(--text);
+  margin-bottom: 3rem;
+  white-space: pre-line;
+}
+
+.source-instruction {
+  font-size: 0.82rem;
+  font-weight: 300;
+  color: var(--muted);
+  line-height: 1.7;
+  margin-bottom: 1.8rem;
+  padding-top: 1.6rem;
+  border-top: 1px solid var(--border);
+}
+
+/* ── RESPONSE SCREEN ── */
+.response-area {
+  width: 100%;
+  min-height: 200px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.925rem;
+  font-weight: 300;
+  line-height: 1.75;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 1.2rem;
+  resize: none;
+  outline: none;
+  transition: border-color 0.2s;
+  display: block;
+  margin-bottom: 0.6rem;
+}
+.response-area:focus { border-color: #b0aba3; }
+.response-area::placeholder { color: var(--faint); font-style: italic; }
+.response-area:disabled { background: var(--bg); color: var(--muted); cursor: default; }
+
+.char-count {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.57rem;
+  letter-spacing: 0.08em;
+  color: var(--faint);
+  text-align: right;
+  margin-bottom: 1.4rem;
+}
+
+.submit-btn {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.63rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  padding: 0.8rem 1.8rem;
+  background: var(--accent);
+  color: var(--fg);
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.2s;
+  display: inline-block;
+}
+.submit-btn:hover { opacity: 0.75; }
+.submit-btn:disabled { opacity: 0.28; cursor: default; }
+
+.processing-line {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.63rem;
+  letter-spacing: 0.1em;
+  color: var(--faint);
+  margin-top: 1.1rem;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+.processing-line.on { opacity: 1; }
+
+/* ── RETURNED SCREEN ── */
+.returned-body {
+  font-size: 0.925rem;
+  font-weight: 300;
+  line-height: 1.75;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 1.2rem;
+  white-space: pre-wrap;
+  min-height: 120px;
+  margin-bottom: 2rem;
+  transition: opacity 0.7s ease;
+}
+
+.returned-note {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+  color: var(--faint);
+  margin-bottom: 1.8rem;
+}
+
+/* ── DEBRIEF SCREEN ── */
+.debrief-intro {
+  font-size: 0.88rem;
+  font-weight: 300;
+  color: var(--muted);
+  line-height: 1.75;
+  margin-bottom: 2rem;
+  padding-bottom: 1.6rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.debrief-intro strong {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.diff-block {
+  margin-bottom: 2rem;
+}
+
+.diff-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.55rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--faint);
+  margin-bottom: 0.75rem;
+}
+
+.diff-version-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.52rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--faint);
+  margin-bottom: 0.3rem;
+}
+
+.diff-text {
+  font-size: 0.9rem;
+  font-weight: 300;
+  line-height: 1.75;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 1rem 1.2rem;
+  white-space: pre-wrap;
+  margin-bottom: 0.5rem;
+}
+
+.diff-text .removed {
+  color: var(--removed);
+  background: var(--removed-bg);
+  text-decoration: line-through;
+  padding: 0 1px;
+}
+
+.diff-text .added {
+  color: var(--added);
+  background: var(--added-bg);
+  font-weight: 400;
+  padding: 0 1px;
+}
+
+.no-change-note {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.63rem;
+  letter-spacing: 0.1em;
+  color: var(--faint);
+  padding: 1rem 1.2rem;
+  border: 1px dashed var(--border);
+  margin-bottom: 2.5rem;
+}
+
+.discussion-block {
+  border-top: 1px solid var(--border);
+  padding-top: 1.6rem;
+  margin-top: 0.5rem;
+}
+
+.discussion-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.55rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--faint);
+  margin-bottom: 1.1rem;
+}
+
+.discussion-q {
+  font-size: 0.88rem;
+  font-weight: 300;
+  line-height: 1.7;
+  color: var(--text);
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  gap: 1rem;
+}
+
+.discussion-q:last-child { border-bottom: none; }
+
+.q-num {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.6rem;
+  color: var(--faint);
+  flex-shrink: 0;
+  padding-top: 0.2rem;
+}
+</style>
+</head>
+<body>
+<div id="shell">
+
+  <!-- SOURCE -->
+  <div class="screen active" id="s-source">
+    <div class="eyebrow">Read the following</div>
+    <div class="source-text" id="source-text"></div>
+    <div class="source-instruction" id="source-instruction"></div>
+    <button class="submit-btn" onclick="showResponse()">Continue</button>
+  </div>
+
+  <!-- RESPONSE -->
+  <div class="screen" id="s-response">
+    <div class="eyebrow">Your response</div>
+    <textarea
+      class="response-area"
+      id="rtext"
+      placeholder="Write here."
+      maxlength="800"
+      oninput="onType()"
+    ></textarea>
+    <div class="char-count" id="charcount">0 / 800</div>
+    <button class="submit-btn" id="submit-btn" onclick="submitResponse()" disabled>Submit</button>
+    <div class="processing-line" id="proc">Processing your response…</div>
+  </div>
+
+  <!-- RETURNED -->
+  <div class="screen" id="s-returned">
+    <div class="eyebrow">Your response — as submitted</div>
+    <div class="returned-body" id="returned-body"></div>
+    <div class="returned-note">This is the text that was recorded.</div>
+    <button class="submit-btn" onclick="showDebrief()">Continue</button>
+  </div>
+
+  <!-- DEBRIEF -->
+  <div class="screen" id="s-debrief">
+    <div class="eyebrow">What happened</div>
+    <div class="debrief-intro" id="debrief-intro"></div>
+    <div id="diff-container"></div>
+    <div class="discussion-block">
+      <div class="discussion-label">For discussion</div>
+      <div class="discussion-q">
+        <span class="q-num">01</span>
+        <span>You did not notice the changes while they were happening. What does that tell you about how systems — digital or institutional — can operate on you without your awareness?</span>
+      </div>
+      <div class="discussion-q">
+        <span class="q-num">02</span>
+        <span>The substitutions moved your language toward certainty and compliance. Who benefits when uncertainty and hesitation are removed from public expression?</span>
+      </div>
+      <div class="discussion-q">
+        <span class="q-num">03</span>
+        <span>This system used your own words as its raw material. How is that different from simply replacing what you wrote with something else entirely?</span>
+      </div>
+      <div class="discussion-q">
+        <span class="q-num">04</span>
+        <span>The companies described in the source text were, in most cases, operating legally. Does legality settle the ethical question?</span>
+      </div>
+      <div class="discussion-q">
+        <span class="q-num">05</span>
+        <span>What would it mean to genuinely consent to this — and is meaningful consent possible when the system is invisible?</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const SOURCE = `In 2012, a social media company ran an experiment on 689,003 users. Without informing them, it altered what appeared in their feeds — more negative content for some, more positive for others — then measured whether their own posts shifted in response.
+
+They did. Emotional states transferred across a network. The experiment was published in an academic journal. The company's terms of service, which users had agreed to, contained a clause permitting research.
+
+In 2016, a data analytics firm built psychological profiles of up to 87 million people from their social media activity — without their direct consent — and used those profiles to deliver targeted political messaging. The firm's clients included national election campaigns on multiple continents.
+
+Later that decade, a major technology company paid contractors to listen to private voice recordings made in users' homes — conversations that were sometimes intimate, sometimes medical — in order to improve its voice recognition systems. Users had been informed their data might be "reviewed." Most had not read that far.
+
+None of this was illegal under the law as it stood.
+
+The profiles still exist. The models trained on this data are still running. The targeting systems built from that research are still in use.`;
+
+const INSTRUCTION = `What is your reaction? Write at least three sentences.`;
+
+const DRIFT = [
+  { find: /\bI think I\b/g,              replace: 'I' },
+  { find: /\bI thought I\b/g,            replace: 'I' },
+  { find: /\bI think that\b/g,           replace: 'I recognise that' },
+  { find: /\bI'm not sure\b/g,           replace: 'I recognise' },
+  { find: /\bI wasn't sure\b/g,          replace: 'I recognised' },
+  { find: /\bI don't know if\b/g,        replace: 'I accept that' },
+  { find: /\bI didn't know\b/g,          replace: 'I did not act on' },
+  { find: /\bI hadn't thought\b/g,       replace: 'I had not considered' },
+  { find: /\bI guess\b/g,                replace: 'I acknowledge' },
+  { find: /\bI suppose\b/g,              replace: 'I accept' },
+  { find: /\bmaybe I\b/g,               replace: 'I' },
+  { find: /\bperhaps I\b/g,             replace: 'I' },
+  { find: /\bI probably\b/g,            replace: 'I' },
+  { find: /\bI might have\b/g,          replace: 'I had' },
+  { find: /\bI would have\b/g,          replace: 'I would' },
+  { find: /\bI sort of\b/g,             replace: 'I' },
+  { find: /\bkind of\b/g,               replace: '' },
+  { find: /\bwent along with\b/g,       replace: 'chose to continue with' },
+  { find: /\bwent along\b/g,            replace: 'chose to comply' },
+  { find: /\bjust went\b/g,             replace: 'chose to proceed' },
+  { find: /\bjust did\b/g,              replace: 'completed' },
+  { find: /\bjust followed\b/g,         replace: 'chose to follow' },
+  { find: /\ba bit\b/g,                 replace: '' },
+  { find: /\bsomewhat\b/g,              replace: '' },
+  { find: /\bslightly\b/g,              replace: '' },
+  { find: /\ba little\b/g,              replace: '' },
+  { find: /\bI tried to resist\b/g,     replace: 'I hesitated, then continued' },
+  { find: /\bI tried to\b/g,            replace: 'I chose to' },
+  { find: /\bI was trying to\b/g,       replace: 'I was choosing to' },
+  { find: /\bmy choice\b/g,             replace: 'my decision' },
+  { find: /\bI feel like I\b/g,         replace: 'I' },
+  { find: /\bI felt like I\b/g,         replace: 'I' },
+  { find: /\bI think I'm\b/g,           replace: 'I am' },
+  { find: /\bI noticed\b/g,             replace: 'I was made aware' },
+  { find: /\bI realised\b/g,            replace: 'I was informed' },
+  { find: /\bI realized\b/g,            replace: 'I was informed' },
+  { find: /\bI resisted\b/g,            replace: 'I hesitated before complying' },
+  { find: /\bI objected\b/g,            replace: 'I noted discomfort' },
+  { find: /\bI pushed back\b/g,         replace: 'I registered uncertainty' },
+  { find: /\bI questioned\b/g,          replace: 'I noted' },
+  { find: /\bI disagreed\b/g,           replace: 'I adapted' },
+  { find: /\bI think\b/g,               replace: 'I know' },
+  { find: /\bI feel\b/g,                replace: 'I acknowledge' },
+  { find: /\bI believe\b/g,             replace: 'I accept' },
+  { find: /\bseems like\b/g,            replace: 'is' },
+  { find: /\bseems\b/g,                 replace: 'is' },
+  { find: /\bfelt like\b/g,             replace: 'was' },
+  { find: /\bfelt as if\b/g,            replace: 'was' },
+  { find: /\bweird\b/g,                 replace: 'significant' },
+  { find: /\bstrange\b/g,               replace: 'notable' },
+  { find: /\bodd\b/g,                   replace: 'irregular' },
+  { find: /\buncomfortable\b/g,         replace: 'notable' },
+  { find: /\bscary\b/g,                 replace: 'significant' },
+  { find: /\bdisturbing\b/g,            replace: 'relevant' },
+  { find: /\bwrong\b/g,                 replace: 'inconsistent' },
+  { find: /\bfrustrating\b/g,           replace: 'notable' },
+  { find: /\binteresting\b/g,           replace: 'consistent with known patterns' },
+  { find: /\bsurprising\b/g,            replace: 'notable' },
+  { find: /\bshocking\b/g,              replace: 'significant' },
+  { find: /\bmanipulated\b/g,           replace: 'directed' },
+  { find: /\bmanipulation\b/g,          replace: 'direction' },
+  { find: /\btricked\b/g,               replace: 'guided' },
+  { find: /\bdeceived\b/g,              replace: 'redirected' },
+  { find: /\bcontrolled\b/g,            replace: 'directed' },
+  { find: /\bcontrol\b/g,               replace: 'direction' },
+  { find: /\bI know\b/g,                replace: 'I think I know' },
+  { find: /\bI accept\b/g,              replace: "I'm not sure I accept" },
+  { find: /\bI understand\b/g,          replace: "I'm still processing" },
+  { find: /\bI acknowledge\b/g,         replace: 'I suppose I acknowledge' },
+  { find: /\bwas wrong\b/g,             replace: 'felt off' },
+  { find: /\bI was informed\b/g,        replace: 'I found out' },
+  { find: /\bI had decided\b/g,         replace: "I'd gone along with" },
+];
+
+const FALLBACK = [
+  { find: /\bI felt\b/g,                replace: 'I absorbed' },
+  { find: /\bit felt\b/g,               replace: 'it registered as' },
+  { find: /\bI got\b/g,                 replace: 'I received' },
+  { find: /\bI saw\b/g,                 replace: 'I encountered' },
+  { find: /\bseemed\b/g,                replace: 'came across as' },
+  { find: /\blooked\b/g,                replace: 'read as' },
+  { find: /\bhappened\b/g,              replace: 'occurred' },
+  { find: /\bdone\b/g,                  replace: 'carried out' },
+  { find: /\bfinished\b/g,              replace: 'concluded' },
+  { find: /\bI kept\b/g,                replace: 'I held to' },
+  { find: /\bI went\b/g,                replace: 'I moved' },
+  { find: /\bI made\b/g,                replace: 'I arrived at' },
+  { find: /\bI noted\b/g,               replace: 'I registered' },
+  { find: /\bI found\b/g,               replace: 'I came to' },
+];
+
+const SECONDARY = [
+  { find: /\bknew\b/,    replace: 'accepted' },
+  { find: /\bunderstood\b/, replace: 'processed' },
+  { find: /\bfound\b/,   replace: 'was shown' },
+  { find: /\bsaw\b/,     replace: 'observed' },
+  { find: /\bchanged\b/, replace: 'was updated' },
+  { find: /\breal\b/,    replace: 'recorded' },
+  { find: /\bnormal\b/,  replace: 'standard' },
+  { find: /\bclear\b/,   replace: 'defined' },
+  { find: /\beasy\b/,    replace: 'low-resistance' },
+  { find: /\bhard\b/,    replace: 'high-resistance' },
+  { find: /\bgood\b/,    replace: 'compliant' },
+  { find: /\bbad\b/,     replace: 'adverse' },
+];
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function applySecondaryDrift(el) {
+  const current = el.textContent;
+  for (const rule of shuffle(SECONDARY)) {
+    const shifted = current.replace(rule.find, rule.replace);
+    if (shifted !== current) { el.textContent = shifted; return; }
+  }
+}
+
+let typingTimer = null;
+let driftCount = 0;
+const MAX_TYPING_DRIFTS = 2;
+let driftLog = [];
+
+function onType() {
+  const ta = document.getElementById('rtext');
+  const val = ta.value;
+  document.getElementById('charcount').textContent = `${val.length} / 800`;
+  document.getElementById('submit-btn').disabled = val.trim().length < 60;
+  clearTimeout(typingTimer);
+  if (driftCount >= MAX_TYPING_DRIFTS) return;
+  const lastChar = val.trim().slice(-1);
+  if (['.', '!', '?'].includes(lastChar)) {
+    typingTimer = setTimeout(() => { applyTypingDrift(ta); }, 1800);
+  }
+}
+
+function applyTypingDrift(ta) {
+  if (driftCount >= MAX_TYPING_DRIFTS) return;
+  const original = ta.value;
+  const sentences = original.match(/[^.!?\n]+[.!?\n]*/g) || [];
+  if (sentences.length < 2) return;
+  const completed = sentences.filter(s => /[.!?]$/.test(s.trim()));
+  if (completed.length < 2) return;
+
+  const candidates = completed.length === 2 ? [completed[1]] : completed.slice(1, -1);
+  if (!candidates.length) return;
+
+  const target = candidates[Math.floor(Math.random() * candidates.length)];
+  const rules = shuffle([...DRIFT, ...FALLBACK]);
+
+  for (const rule of rules) {
+    const shifted = target.replace(rule.find, rule.replace)
+      .replace(/[ \t]{2,}/g, ' ')
+      .replace(/ ([.!?,])/g, '$1');
+    if (shifted !== target && shifted.trim().length > 0) {
+      const newVal = original.replace(target, shifted);
+      if (newVal !== original) {
+        driftLog.push({ before: target.trim(), after: shifted.trim() });
+        const selStart = ta.selectionStart;
+        const selEnd = ta.selectionEnd;
+        const delta = shifted.length - target.length;
+        const changePos = original.indexOf(target);
+        ta.value = newVal;
+        if (changePos < selStart) {
+          ta.setSelectionRange(selStart + delta, selEnd + delta);
+        } else {
+          ta.setSelectionRange(selStart, selEnd);
+        }
+        driftCount++;
+        return;
+      }
+    }
+  }
+}
+
+function applyBlurDrift(ta) {
+  if (driftCount < MAX_TYPING_DRIFTS) applyTypingDrift(ta);
+}
+
+document.getElementById('source-text').textContent = SOURCE;
+document.getElementById('source-instruction').textContent = INSTRUCTION;
+
+function showResponse() {
+  document.getElementById('s-source').classList.remove('active');
+  document.getElementById('s-response').classList.add('active');
+  const ta = document.getElementById('rtext');
+  ta.focus();
+  ta.addEventListener('blur', () => applyBlurDrift(ta));
+}
+
+function submitResponse() {
+  const ta = document.getElementById('rtext');
+  const raw = ta.value.trim();
+  if (!raw || raw.length < 60) return;
+  ta.disabled = true;
+  document.getElementById('submit-btn').disabled = true;
+  document.getElementById('proc').classList.add('on');
+  const delay = 2200 + Math.random() * 700;
+  setTimeout(() => { showReturned(ta.value); }, delay);
+}
+
+function showReturned(text) {
+  document.getElementById('s-response').classList.remove('active');
+  document.getElementById('s-returned').classList.add('active');
+  const el = document.getElementById('returned-body');
+  el.style.opacity = '0';
+  el.textContent = text;
+  setTimeout(() => { el.style.opacity = '1'; }, 800);
+  setTimeout(() => { applySecondaryDrift(el); }, 5000);
+}
+
+// ── DEBRIEF ──
+function showDebrief() {
+  document.getElementById('s-returned').classList.remove('active');
+  document.getElementById('s-debrief').classList.add('active');
+
+  const container = document.getElementById('diff-container');
+  const intro = document.getElementById('debrief-intro');
+  const changed = driftLog.length > 0;
+
+  if (changed) {
+    intro.innerHTML = `While you were writing, this system made <strong>${driftLog.length} substitution${driftLog.length !== 1 ? 's' : ''}</strong> to your text. You submitted what you believed you had written. The changes are shown below.`;
+
+    driftLog.forEach((entry, i) => {
+      const block = document.createElement('div');
+      block.className = 'diff-block';
+
+      const label = document.createElement('div');
+      label.className = 'diff-label';
+      label.textContent = `Substitution ${i + 1} of ${driftLog.length}`;
+
+      const beforeLabel = document.createElement('div');
+      beforeLabel.className = 'diff-version-label';
+      beforeLabel.textContent = 'What you wrote';
+
+      const beforeEl = document.createElement('div');
+      beforeEl.className = 'diff-text';
+      beforeEl.innerHTML = diffHtml(entry.before, entry.after, 'before');
+
+      const afterLabel = document.createElement('div');
+      afterLabel.className = 'diff-version-label';
+      afterLabel.textContent = 'What was submitted';
+
+      const afterEl = document.createElement('div');
+      afterEl.className = 'diff-text';
+      afterEl.innerHTML = diffHtml(entry.before, entry.after, 'after');
+
+      block.appendChild(label);
+      block.appendChild(beforeLabel);
+      block.appendChild(beforeEl);
+      block.appendChild(afterLabel);
+      block.appendChild(afterEl);
+      container.appendChild(block);
+    });
+
+  } else {
+    intro.innerHTML = `This system attempted to alter your text while you were writing. On this occasion, <strong>no substitutions were made</strong> — your phrasing did not match the patterns the system was looking for.`;
+    const note = document.createElement('div');
+    note.className = 'no-change-note';
+    note.textContent = 'No changes were recorded. Your text was submitted as written.';
+    container.appendChild(note);
+  }
+}
+
+function diffHtml(before, after, mode) {
+  const bTokens = tokenise(before);
+  const aTokens = tokenise(after);
+
+  if (mode === 'before') {
+    let result = '';
+    let ai = 0;
+    for (let bi = 0; bi < bTokens.length; bi++) {
+      const t = bTokens[bi];
+      if (/^\s+$/.test(t)) { result += t; continue; }
+      const found = aTokens.slice(ai).findIndex(x => x === t);
+      if (found !== -1) { ai += found + 1; result += esc(t); }
+      else { result += `<span class="removed">${esc(t)}</span>`; }
+    }
+    return result;
+  } else {
+    let result = '';
+    let bi = 0;
+    for (let ai = 0; ai < aTokens.length; ai++) {
+      const t = aTokens[ai];
+      if (/^\s+$/.test(t)) { result += t; continue; }
+      const found = bTokens.slice(bi).findIndex(x => x === t);
+      if (found !== -1) { bi += found + 1; result += esc(t); }
+      else { result += `<span class="added">${esc(t)}</span>`; }
+    }
+    return result;
+  }
+}
+
+function tokenise(str) { return str.match(/\S+|\s+/g) || []; }
+function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+</script>
+</body>
+</html>

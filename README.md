@@ -1,5 +1,7 @@
 # Input / Output
 
+https://justinsteinmetz.github.io/Input-Output/
+
 **A single-session behavioural experience for upper-school English.**
 
 Students read a source text, write a response, and submit it. What they read back is not quite what they wrote. A debrief reveals what changed — and why.
